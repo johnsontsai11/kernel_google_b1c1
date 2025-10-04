@@ -1146,4 +1146,13 @@ void susfs_init(void) {
 
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
+// Stub functions for compatibility with KernelSU-Next
+void susfs_set_current_non_root_user_app_proc(void)
+{
+    // Not implemented in this SUSFS version
+}
 
+void susfs_run_sus_path_loop(uid_t uid)
+{
+    // Not implemented in this SUSFS version
+}

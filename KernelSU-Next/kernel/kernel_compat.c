@@ -76,7 +76,9 @@ void ksu_android_ns_fs_check()
 	task_unlock(current);
 }
 
-int ksu_access_ok(const void *addr, unsigned long size) {
+/* single internal definition */
+inline int ksu_access_ok(const void *addr, unsigned long size)
+{
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
     /* For kernels before 5.0.0, pass the type argument to access_ok. */
     return access_ok(VERIFY_READ, addr, size);
@@ -183,15 +185,6 @@ long ksu_strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr,
 	return ret;
 }
 #endif
-
-static inline int ksu_access_ok(const void *addr, unsigned long size)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
-	return access_ok(addr, size);
-#else
-	return access_ok(VERIFY_READ, addr, size);
-#endif
-}
 
 long ksu_strncpy_from_user_retry(char *dst, const void __user *unsafe_addr,
 				   long count)

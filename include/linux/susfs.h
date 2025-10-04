@@ -187,3 +187,7 @@ int susfs_get_enabled_features(char __user* buf, size_t bufsize);
 void susfs_init(void);
 
 #endif
+
+// Compatibility stubs for KernelSU-Next
+void susfs_set_current_non_root_user_app_proc(void);
+void susfs_run_sus_path_loop(uid_t uid);

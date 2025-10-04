@@ -608,7 +608,8 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
 				pr_info("susfs: copy_to_user() failed\n");
 			return 0;
 		}
-		if (arg2 == CMD_SUSFS_ADD_SUS_PATH_LOOP) {
+		// if (arg2 == CMD_SUSFS_ADD_SUS_PATH_LOOP) // Disabled: command not in SUSFS version
+		if (0) {
 			int error = 0;
 			if (!ksu_access_ok((void __user*)arg3, sizeof(struct st_susfs_sus_path))) {
 				pr_err("susfs: CMD_SUSFS_ADD_SUS_PATH_LOOP -> arg3 is not accessible\n");
@@ -686,7 +687,8 @@ int ksu_handle_prctl(int option, unsigned long arg2, unsigned long arg3,
 				pr_info("susfs: copy_to_user() failed\n");
 			return 0;
 		}
-		if (arg2 == CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE) {
+		// if (arg2 == CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE) { // Disabled: CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE not available in this SUSFS version
+		if (0) {
 			int error = 0;
 			if (arg3 != 0 && arg3 != 1) {
 				pr_err("susfs: CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE -> arg3 can only be 0 or 1\n");
