@@ -98,18 +98,47 @@ check_dependencies() {
 
 setup_ccache() {
     echo -e "${YELLOW}[INFO]${NC} Setting up ccache..."
-    
-    # Create ccache directory if it doesn't exist
+
+    # Create cache directory
     mkdir -p "${CCACHE_DIR}"
-    
-    # Configure ccache
-    ccache -M 50G  # Set max cache size to 50GB
-    
+
+    # Initialize cache (limit: 50 GB)
+    ccache -M 50G >/dev/null
+    ccache -z >/dev/null
+
+    # Export main environment variables
     export USE_CCACHE=1
     export CCACHE_DIR="${CCACHE_DIR}"
-    
+    export CCACHE_CPP2=yes
+    export CCACHE_COMPILERCHECK=content
+    export CCACHE_BASEDIR="${KERNEL_DIR}"
+
+    # Ensure ccache wrappers for LLVM toolchain
+    mkdir -p "${HOME}/.local/bin"
+    local CCACHE_BIN
+    CCACHE_BIN="$(which ccache)"
+
+    ln -sf "${CCACHE_BIN}" "${HOME}/.local/bin/clang"
+    ln -sf "${CCACHE_BIN}" "${HOME}/.local/bin/clang++"
+
+    # Make sure wrapper path comes first
+    export PATH="${HOME}/.local/bin:${PATH}"
+
+    # Tell ccache where the real compiler binaries live
+    # (adjust automatically if clang already found)
+    if command -v clang >/dev/null 2>&1; then
+        export CCACHE_PATH="$(dirname "$(command -v clang)")"
+    else
+        export CCACHE_PATH="${TOOLCHAIN_BASE}/clang-r416183b/bin"
+    fi
+
     echo -e "${GREEN}[OK]${NC} ccache configured (max size: 50GB)"
-    ccache -s  # Show statistics
+    echo -e "${BLUE}[INFO]${NC} CCACHE_DIR=${CCACHE_DIR}"
+    echo -e "${BLUE}[INFO]${NC} CCACHE_PATH=${CCACHE_PATH}"
+    echo -e "${BLUE}[INFO]${NC} clang wrapper in PATH → $(command -v clang)"
+
+    # Show statistics
+    ccache -s
 }
 
 check_toolchain() {
@@ -663,7 +692,7 @@ create_flashable_zip() {
     echo -e "${GREEN}[OK]${NC} Kernel image copied to: ${output_dir}/${img_name}"
     
     # Create a symlink to the most common name
-    ln -sf "${img_name}" "${output_dir}/Image.lz4-dtb" 2>/dev/null
+    ln -sf "${BUILD_DIR}/arch/arm64/boot/${img_name}" "${output_dir}/Image.lz4-dtb" 2>/dev/null
     
     # Copy dtb/dtbo files if they exist
     if [[ -d "${BUILD_DIR}/arch/${ARCH}/boot/dts" ]]; then
@@ -697,7 +726,7 @@ EOF
         
         # Create the flashable ZIP
         cd "${ak3_dir}"
-        zip -r9 "${output_dir}/${zip_name}" * -x .git .gitignore README.md *placeholder .gitattributes 2>&1 | grep -v "adding:"
+        zip -r9 "${output_dir}/${zip_name}" * -x .git .gitignore README.md *placeholder .gitattributes "${output_dir}/*" "*.zip" 2>&1 | grep -v "adding:"
         cd - > /dev/null
         
         if [[ -f "${output_dir}/${zip_name}" ]]; then
