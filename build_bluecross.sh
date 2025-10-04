@@ -453,7 +453,7 @@ configure_kernel() {
         ksu_enabled=true
     fi
     
-    if grep -q "CONFIG_SUSFS=y" "${config_file}" 2>/dev/null; then
+    if grep -q "CONFIG_KSU_SUSFS=y" "${config_file}" 2>/dev/null; then
         echo -e "${GREEN}[OK]${NC} SUSFS configuration found"
         susfs_enabled=true
     fi
@@ -466,7 +466,7 @@ configure_kernel() {
     
     if [[ "${susfs_enabled}" == false ]]; then
         echo -e "${YELLOW}[WARNING]${NC} SUSFS not enabled, adding to config..."
-        echo "CONFIG_SUSFS=y" >> "${config_file}"
+        echo "CONFIG_KSU_SUSFS=y" >> "${config_file}"
     fi
     
     # Disable 32-bit vDSO build (causes linker issues with Clang/x86_64 host)
