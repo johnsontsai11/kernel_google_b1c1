@@ -46,7 +46,7 @@ GCC_STANDALONE="${HOME}/toolchain/aarch64-linux-android-4.9"
 
 # Build configuration
 JOBS=$(nproc)
-VERBOSE=1  # Set to 0 for quiet build
+VERBOSE=0  # Set to 0 for quiet build
 
 # =============================================================================
 # Functions
@@ -104,7 +104,6 @@ setup_ccache() {
     
     # Configure ccache
     ccache -M 50G  # Set max cache size to 50GB
-    ccache -z      # Zero statistics
     
     export USE_CCACHE=1
     export CCACHE_DIR="${CCACHE_DIR}"
@@ -437,48 +436,36 @@ clean_build() {
 
 configure_kernel() {
     echo -e "${YELLOW}[INFO]${NC} Configuring kernel..."
-    
-    # Load default configuration
+
+    # Step 1: load base defconfig
     make O="${BUILD_DIR}" "${DEFCONFIG}"
-    
-    # Verify KSUN + SUSFS configuration
-    echo -e "${BLUE}[INFO]${NC} Checking KSUN + SUSFS configuration..."
-    
+
     local config_file="${BUILD_DIR}/.config"
-    local ksu_enabled=false
-    local susfs_enabled=false
-    
-    if grep -q "CONFIG_KSU=y\|CONFIG_KERNELSU=y" "${config_file}" 2>/dev/null; then
-        echo -e "${GREEN}[OK]${NC} KernelSU configuration found"
-        ksu_enabled=true
-    fi
-    
-    if grep -q "CONFIG_SUSFS=y" "${config_file}" 2>/dev/null; then
-        echo -e "${GREEN}[OK]${NC} SUSFS configuration found"
-        susfs_enabled=true
-    fi
-    
-    # Enable options if not already enabled
-    if [[ "${ksu_enabled}" == false ]]; then
-        echo -e "${YELLOW}[WARNING]${NC} KSU not enabled, adding to config..."
-        echo "CONFIG_KSU=y" >> "${config_file}"
-    fi
-    
-    if [[ "${susfs_enabled}" == false ]]; then
-        echo -e "${YELLOW}[WARNING]${NC} SUSFS not enabled, adding to config..."
-        echo "CONFIG_SUSFS=y" >> "${config_file}"
-    fi
-    
-    # Disable 32-bit vDSO build (causes linker issues with Clang/x86_64 host)
-    echo -e "${YELLOW}[INFO]${NC} Disabling CONFIG_VDSO32 (32-bit compat vDSO not needed for kernel)"
-    sed -i 's/CONFIG_VDSO32=y/# CONFIG_VDSO32 is not set/' "${config_file}" 2>/dev/null
-    sed -i 's/CONFIG_COMPAT_VDSO=y/# CONFIG_COMPAT_VDSO is not set/' "${config_file}" 2>/dev/null
+
+    # Step 2: disable 32-bit vDSO (avoid linker issues on clang/x86_64 host)
+    echo -e "${YELLOW}[INFO]${NC} Disabling CONFIG_VDSO32 (not needed)"
+    sed -i 's/^CONFIG_VDSO32=y/# CONFIG_VDSO32 is not set/' "${config_file}" 2>/dev/null
+    sed -i 's/^CONFIG_COMPAT_VDSO=y/# CONFIG_COMPAT_VDSO is not set/' "${config_file}" 2>/dev/null
     echo "# CONFIG_VDSO32 is not set" >> "${config_file}"
     echo "# CONFIG_COMPAT_VDSO is not set" >> "${config_file}"
-    
-    # Regenerate config with new options
+
+    # Step 3: finalize with olddefconfig
     make O="${BUILD_DIR}" olddefconfig
-    
+
+    # Step 4: verify configs
+    echo -e "${BLUE}[INFO]${NC} Checking KSUN + SUSFS configuration..."
+    if grep -q "CONFIG_KSU=y\|CONFIG_KERNELSU=y" "${config_file}"; then
+        echo -e "${GREEN}[OK]${NC} KernelSU enabled"
+    else
+        echo -e "${RED}[ERROR]${NC} KernelSU missing!"
+    fi
+
+    if grep -q "CONFIG_KSU_SUSFS=y" "${config_file}"; then
+        echo -e "${GREEN}[OK]${NC} SUSFS enabled"
+    else
+        echo -e "${RED}[ERROR]${NC} SUSFS missing!"
+    fi
+
     echo -e "${GREEN}[OK]${NC} Kernel configuration completed"
 }
 
@@ -762,10 +749,10 @@ main() {
     echo -e "Output package: ${KERNEL_DIR}/output/"
     echo ""
     echo -e "${YELLOW}Next steps:${NC}"
-    echo "1. Flash the kernel image using fastboot:"
-    echo "   fastboot flash boot output/Image.lz4-dtb"
-    echo "2. Or use a custom recovery to flash the kernel"
-    echo "3. Install KernelSU Manager app to manage root access"
+    echo "1. Boot into recovery (TWRP or similar) and flash the ZIP:"
+    echo "   adb push output/KSUN-SUSFS-b1c1-*.zip /sdcard/"
+    echo "   Then install from recovery."
+    echo "2. Or repack into a boot.img using AnyKernel3 if you need fastboot flashing."
 }
 
 # Run main function
