@@ -1135,14 +1135,18 @@ out_kfree_kbuf:
 
 
 /* susfs_init */
-void susfs_init(void) {
-	spin_lock_init(&susfs_spin_lock);
+int __init susfs_init(void)
+{
+    spin_lock_init(&susfs_spin_lock);
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-	spin_lock_init(&susfs_uname_spin_lock);
-	susfs_my_uname_init();
+    spin_lock_init(&susfs_uname_spin_lock);
+    susfs_my_uname_init();
 #endif
-	SUSFS_LOGI("susfs is initialized! version: " SUSFS_VERSION " \n");
+    pr_info("SUSFS: init success (version: %s)\n", SUSFS_VERSION);
+    return 0;
 }
+subsys_initcall(susfs_init);
+
 
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)

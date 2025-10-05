@@ -14,6 +14,7 @@ obj-y :=	open.o read_write.o file_table.o super.o \
 		stack.o fs_struct.o statfs.o fs_pin.o nsfs.o
 
 obj-$(CONFIG_KSU_SUSFS) += susfs.o
+ccflags-$(CONFIG_KSU_SUSFS) += -DCONFIG_SUSFS
 
 ifeq ($(CONFIG_BLOCK),y)
 obj-y +=	buffer.o block_dev.o direct-io.o mpage.o

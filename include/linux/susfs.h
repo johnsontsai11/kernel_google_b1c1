@@ -184,7 +184,7 @@ struct filename* susfs_get_redirected_path(unsigned long ino);
 int susfs_get_enabled_features(char __user* buf, size_t bufsize);
 
 /* susfs_init */
-void susfs_init(void);
+int susfs_init(void);
 
 #endif
 
