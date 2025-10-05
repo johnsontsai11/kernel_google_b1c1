@@ -45,7 +45,7 @@ GCC_STANDALONE="${HOME}/toolchain/aarch64-linux-android-4.9"
 # Will be auto-detected in order of preference
 
 # Build configuration
-JOBS=$(nproc)
+JOBS=${JOBS:-$(nproc)}
 VERBOSE=0  # Set to 0 for quiet build
 
 # =============================================================================
@@ -99,46 +99,21 @@ check_dependencies() {
 setup_ccache() {
     echo -e "${YELLOW}[INFO]${NC} Setting up ccache..."
 
-    # Create cache directory
     mkdir -p "${CCACHE_DIR}"
-
-    # Initialize cache (limit: 50 GB)
     ccache -M 50G >/dev/null
-    ccache -z >/dev/null
 
-    # Export main environment variables
     export USE_CCACHE=1
     export CCACHE_DIR="${CCACHE_DIR}"
     export CCACHE_CPP2=yes
     export CCACHE_COMPILERCHECK=content
     export CCACHE_BASEDIR="${KERNEL_DIR}"
+    export CC="ccache clang"
 
-    # Ensure ccache wrappers for LLVM toolchain
-    mkdir -p "${HOME}/.local/bin"
-    local CCACHE_BIN
-    CCACHE_BIN="$(which ccache)"
-
-    ln -sf "${CCACHE_BIN}" "${HOME}/.local/bin/clang"
-    ln -sf "${CCACHE_BIN}" "${HOME}/.local/bin/clang++"
-
-    # Make sure wrapper path comes first
-    export PATH="${HOME}/.local/bin:${PATH}"
-
-    # Tell ccache where the real compiler binaries live
-    # (adjust automatically if clang already found)
-    if command -v clang >/dev/null 2>&1; then
-        export CCACHE_PATH="$(dirname "$(command -v clang)")"
-    else
-        export CCACHE_PATH="${TOOLCHAIN_BASE}/clang-r416183b/bin"
-    fi
+    # Improve kernel build compatibility
+    export CCACHE_SLOPPINESS=file_macro,time_macros,include_file_mtime,include_file_ctime
+    export CCACHE_LOGFILE="${BUILD_DIR}/ccache.log"
 
     echo -e "${GREEN}[OK]${NC} ccache configured (max size: 50GB)"
-    echo -e "${BLUE}[INFO]${NC} CCACHE_DIR=${CCACHE_DIR}"
-    echo -e "${BLUE}[INFO]${NC} CCACHE_PATH=${CCACHE_PATH}"
-    echo -e "${BLUE}[INFO]${NC} clang wrapper in PATH → $(command -v clang)"
-
-    # Show statistics
-    ccache -s
 }
 
 check_toolchain() {
@@ -508,6 +483,7 @@ build_kernel() {
     local make_args=(
         "O=${BUILD_DIR}"
         "-j${JOBS}"
+	"CC=ccache clang"
     )
     
     # Add LLVM flags if using Clang
@@ -688,11 +664,12 @@ create_flashable_zip() {
     
     # Copy kernel image
     local img_name=$(basename "$kernel_path")
-    cp "$kernel_path" "${output_dir}/"
-    echo -e "${GREEN}[OK]${NC} Kernel image copied to: ${output_dir}/${img_name}"
-    
-    # Create a symlink to the most common name
-    ln -sf "${BUILD_DIR}/arch/arm64/boot/${img_name}" "${output_dir}/Image.lz4-dtb" 2>/dev/null
+    if [[ "$kernel_path" != "${output_dir}/${img_name}" ]]; then
+        cp "$kernel_path" "${output_dir}/"
+        echo -e "${GREEN}[OK]${NC} Kernel image copied to: ${output_dir}/${img_name}"
+    else
+        echo -e "${YELLOW}[INFO]${NC} Skipping copy (source and destination are the same)"
+    fi
     
     # Copy dtb/dtbo files if they exist
     if [[ -d "${BUILD_DIR}/arch/${ARCH}/boot/dts" ]]; then
@@ -726,8 +703,10 @@ EOF
         
         # Create the flashable ZIP
         cd "${ak3_dir}"
-        zip -r9 "${output_dir}/${zip_name}" * -x .git .gitignore README.md *placeholder .gitattributes "${output_dir}/*" "*.zip" 2>&1 | grep -v "adding:"
-        cd - > /dev/null
+	zip -r9 "${output_dir}/${zip_name}" * \
+	    -x .git .gitignore README.md *placeholder .gitattributes "${output_dir}/*" "*.zip" \
+	    >/dev/null
+	cd - >/dev/null
         
         if [[ -f "${output_dir}/${zip_name}" ]]; then
             local zip_size=$(du -h "${output_dir}/${zip_name}" | cut -f1)
@@ -750,6 +729,11 @@ EOF
 # =============================================================================
 
 main() {
+    local doclean=0
+    for arg in "$@"; do
+        [[ "$arg" == "--clean" ]] && doclean=1
+    done
+
     print_banner
     
     # Pre-build checks
@@ -759,7 +743,11 @@ main() {
     check_kernel_source
     
     # Build process
-    clean_build
+    if [[ $doclean -eq 1 ]]; then
+        clean_build
+    else
+        echo -e "${YELLOW}[INFO]${NC} Skipping clean build (incremental mode)"
+    fi
     configure_kernel
     build_kernel
     
