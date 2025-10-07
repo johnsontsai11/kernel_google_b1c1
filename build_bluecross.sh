@@ -423,41 +423,37 @@ check_kernel_source() {
 }
 
 clean_build() {
-    echo -e "${YELLOW}[INFO]${NC} Cleaning previous build..."
-    
-    # Clean kernel
-    make clean
-    make mrproper
-    
-    # Clean output directory
+    echo -e "${YELLOW}[INFO]${NC} Performing deep clean (mrproper only)..."
+
+    make O="${BUILD_DIR}" mrproper
+
     if [[ -d "${BUILD_DIR}" ]]; then
         rm -rf "${BUILD_DIR}"
     fi
     mkdir -p "${BUILD_DIR}"
-    
-    echo -e "${GREEN}[OK]${NC} Clean completed"
+
+    echo -e "${GREEN}[OK]${NC} Clean completed (mrproper done)"
 }
 
 configure_kernel() {
-    echo -e "${YELLOW}[INFO]${NC} Configuring kernel..."
-
-    # Step 1: load base defconfig
-    make O="${BUILD_DIR}" "${DEFCONFIG}"
-
     local config_file="${BUILD_DIR}/.config"
 
-    # Step 2: disable 32-bit vDSO (avoid linker issues on clang/x86_64 host)
-    echo -e "${YELLOW}[INFO]${NC} Disabling CONFIG_VDSO32 (not needed)"
+    if [[ ! -f "${config_file}" ]]; then
+        echo -e "${YELLOW}[INFO]${NC} No existing config found — creating fresh .config"
+        make O="${BUILD_DIR}" "${DEFCONFIG}"
+    else
+        echo -e "${YELLOW}[INFO]${NC} Reusing existing .config for incremental build"
+    fi
+
+    echo -e "${YELLOW}[INFO]${NC} Disabling CONFIG_VDSO32 (if present)"
     sed -i 's/^CONFIG_VDSO32=y/# CONFIG_VDSO32 is not set/' "${config_file}" 2>/dev/null
     sed -i 's/^CONFIG_COMPAT_VDSO=y/# CONFIG_COMPAT_VDSO is not set/' "${config_file}" 2>/dev/null
     echo "# CONFIG_VDSO32 is not set" >> "${config_file}"
     echo "# CONFIG_COMPAT_VDSO is not set" >> "${config_file}"
 
-    # Step 3: finalize with olddefconfig
+    echo -e "${YELLOW}[INFO]${NC} Finalizing configuration..."
     make O="${BUILD_DIR}" olddefconfig
 
-    # Step 4: verify configs
-    echo -e "${BLUE}[INFO]${NC} Checking KSUN + SUSFS configuration..."
     if grep -q "CONFIG_KSU=y\|CONFIG_KERNELSU=y" "${config_file}"; then
         echo -e "${GREEN}[OK]${NC} KernelSU enabled"
     else
