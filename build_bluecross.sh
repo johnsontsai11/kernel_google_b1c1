@@ -45,9 +45,12 @@ GCC_STANDALONE="${HOME}/toolchain/aarch64-linux-android-4.9"
 # Will be auto-detected in order of preference
 
 # Build configuration
-JOBS=${JOBS:-$(nproc)}
 VERBOSE=0  # Set to 0 for quiet build
-
+if [[ "${JOBS}" == "all" ]]; then
+    JOBS=$(nproc)
+else
+    JOBS=${JOBS:-8}
+fi
 # =============================================================================
 # Functions
 # =============================================================================
@@ -472,8 +475,6 @@ configure_kernel() {
 build_kernel() {
     echo -e "${YELLOW}[INFO]${NC} Starting kernel build..."
     echo -e "${BLUE}[INFO]${NC} Using ${JOBS} parallel jobs"
-    
-    local start_time=$(date +%s)
     
     # Build command arguments
     local make_args=(
